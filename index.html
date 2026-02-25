@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Berke Antar</title>
+    <style>
+        :root {
+            --bg-color: #0a0a0a;
+            --text-color: #e0e0e0;
+            --accent-color: #00ff41; /* Terminal yeşili - Hacker estetiği */
+            --font-stack: 'SF Mono', 'Fira Code', 'Roboto Mono', monospace;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-stack);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .container {
+            text-align: left;
+            padding: 2rem;
+            max-width: 600px;
+            border-left: 2px solid #333;
+            animation: fadeIn 1.5s ease-in-out;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 500;
+            margin-bottom: 1rem;
+            letter-spacing: -0.5px;
+        }
+
+        p {
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: #888;
+            margin-bottom: 2rem;
+        }
+
+        .status {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--accent-color);
+            display: inline-block;
+            padding: 4px 8px;
+            background: rgba(0, 255, 65, 0.1);
+            border-radius: 4px;
+        }
+
+        .cursor {
+            display: inline-block;
+            width: 8px;
+            height: 15px;
+            background-color: var(--accent-color);
+            animation: blink 1s step-end infinite;
+            vertical-align: middle;
+            margin-left: 5px;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="status" id="status-text">SYSTEM_STATUS: BUILDING</div>
+        <h1 id="main-title">Berke Antar</h1>
+        <p id="description">
+            </p>
+        <div style="font-size: 0.8rem; color: #444;">root@berkeantar:~# <span class="cursor"></span></div>
+    </div>
+
+    <script>
+        // Tarayıcı dilini al (örn: 'tr-TR' veya 'en-US' -> sadece 'tr' veya 'en' kısmını alıyoruz)
+        const userLang = navigator.language || navigator.userLanguage; 
+        const langCode = userLang.split('-')[0];
+
+        // İçerik Veritabanı (İspanyolca öğrenme sürecin ve İtalyanca ilgin için bunları da ekledim)
+        const content = {
+            tr: {
+                title: "Yapım Aşamasında",
+                desc: "Dijital altyapı şu anda yeniden yapılandırılıyor. Çok yakında daha kapsamlı bir deneyimle yayında olacak.",
+                status: "SİSTEM_DURUMU: İNŞA_EDİLİYOR"
+            },
+            en: {
+                title: "Work in Progress",
+                desc: "Digital infrastructure is currently being rearchitected. Launching soon with a comprehensive experience.",
+                status: "SYSTEM_STATUS: BUILDING"
+            },
+            es: {
+                title: "En Construcción",
+                desc: "La infraestructura digital se está reestructurando actualmente. Muy pronto estará en línea con una experiencia integral.",
+                status: "ESTADO_DEL_SISTEMA: CONSTRUYENDO"
+            },
+            it: {
+                title: "Lavori in Corso",
+                desc: "L'infrastruttura digitale è attualmente in fase di ristrutturazione. Presto online con un'esperienza completa.",
+                status: "STATO_SISTEMA: IN_COSTRUZIONE"
+            }
+        };
+
+        // Dil seçimi: Desteklenen dil varsa onu kullan, yoksa İngilizce'ye (en) düş.
+        const selectedContent = content[langCode] || content['en'];
+
+        // DOM Manipülasyonu
+        document.getElementById('main-title').innerText = "Berke Antar // " + selectedContent.title;
+        document.getElementById('description').innerText = selectedContent.desc;
+        document.getElementById('status-text').innerText = selectedContent.status;
+
+        // Konsola "Easter Egg" bırakalım (Meraklı geliştiriciler için)
+        console.log("%cSystem locked. Picklocking recommended.", "color: #00ff41; background: #000; font-size: 12px; padding: 5px;");
+    </script>
+</body>
+</html>
