@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Radiative Cooling Telemetry v4.2</title>
+    <style>
+        :root {
+            --bg-dark: #050505;
+            --panel-bg: #0f0f0f;
+            --border: #333;
+            --accent: #00ff9d;
+            --accent-dim: rgba(0, 255, 157, 0.1);
+            --danger: #ff4757;
+            --warn: #ffa502;
+            --text-main: #e0e0e0;
+            --text-muted: #666;
+            --font-tech: 'Segoe UI Mono', 'SF Mono', 'Fira Code', monospace;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: var(--font-tech);
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* --- HEADER --- */
+        header {
+            height: 50px;
+            padding: 0 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #080808;
+            flex-shrink: 0;
+        }
+        h1 { margin: 0; font-size: 0.9rem; letter-spacing: 2px; color: var(--accent); text-transform: uppercase; }
+        .sys-status { font-size: 0.7rem; color: var(--text-muted); display: flex; gap: 10px; }
+        .blink { animation: blinker 2s linear infinite; color: var(--accent); }
+        @keyframes blinker { 50% { opacity: 0; } }
+
+        /* --- MAIN LAYOUT --- */
+        .main-container {
+            display: flex;
+            flex-grow: 1;
+            overflow: hidden; 
+        }
+
+        /* --- LEFT CONTROLS --- */
+        .controls-panel {
+            width: 320px;
+            background: var(--panel-bg);
+            border-right: 1px solid var(--border);
+            padding: 25px;
+            overflow-y: auto;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .control-group { position: relative; }
+        label {
+            display: flex; justify-content: space-between;
+            font-size: 0.7rem; margin-bottom: 8px;
+            color: #888; font-weight: 700; letter-spacing: 0.5px;
+        }
+        .val-readout { color: var(--accent); font-size: 0.85rem; }
+        
+        /* --- FIXED SLIDER CSS (VISUAL INTERACTIVITY) --- */
+        input[type=range] {
+            -webkit-appearance: none; 
+            width: 100%; 
+            background: #222; /* Default background */
+            height: 6px;
+            border-radius: 3px;
+            margin: 0;
+            cursor: pointer;
+        }
+        
+        input[type=range]:focus { outline: none; }
+
+        /* IMPORTANT: Track must be transparent for JS gradient on input to show */
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%; 
+            height: 6px; 
+            background: transparent; 
+            border: none;
+        }
+
+        /* Thumb Styles */
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; 
+            height: 18px; 
+            width: 10px;
+            border-radius: 2px;
+            background: #fff; 
+            cursor: pointer;
+            margin-top: -6px; /* Center thumb on track */
+            box-shadow: 0 0 5px rgba(0,0,0,0.5);
+            border: 1px solid #000;
+        }
+
+        /* --- VIEWPORT (VISUALIZATION) --- */
+        .viewport {
+            flex-grow: 1;
+            background: radial-gradient(circle at center, #111 0%, #000 100%);
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+        .stars {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-image: radial-gradient(white, rgba(255,255,255,.1) 1px, transparent 1.5px);
+            background-size: 550px 550px; opacity: 0.3;
+        }
+
+        /* PIPE VISUALS */
+        .pipe-wrapper {
+            position: relative; 
+            z-index: 10;
+            transition: width 0.1s linear, height 0.1s linear; 
+        }
+
+        .pipe-core {
+            width: 100%; 
+            height: 100%;
+            background: #222; 
+            border-radius: 4px; 
+            position: relative; 
+            overflow: hidden; 
+            transition: background 0.1s, box-shadow 0.1s;
+        }
+
+        .pipe-flow {
+            position: absolute; top: 0; left: 0; width: 200%; height: 100%;
+            background: repeating-linear-gradient(90deg, transparent, transparent 20px, rgba(255,255,255,0.05) 20px, rgba(255,255,255,0.05) 60px);
+            animation: flowAnim 1s linear infinite;
+            opacity: 0.5;
+            pointer-events: none;
+            mix-blend-mode: overlay;
+        }
+        @keyframes flowAnim { from { transform: translateX(0); } to { transform: translateX(-60px); } }
+
+        .dim-line {
+            position: absolute; bottom: -25px; left: 0; width: 100%;
+            border-top: 1px dashed #444; color: #555;
+            font-size: 0.65rem; text-align: center; padding-top: 4px;
+        }
+
+        /* --- TELEMETRY PANEL (BOTTOM) --- */
+        .telemetry-panel {
+            height: 220px;
+            background: #0b0b0b;
+            border-top: 1px solid var(--border);
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: 30px 1fr;
+            gap: 1px;
+            background-color: var(--border);
+            flex-shrink: 0;
+        }
+
+        .tele-header {
+            grid-column: 1 / -1;
+            background: #111;
+            display: flex; align-items: center; padding: 0 20px;
+            font-size: 0.7rem; color: var(--accent); letter-spacing: 1px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .tele-module {
+            background: #0e0e0e;
+            padding: 15px;
+            display: flex; flex-direction: column; justify-content: space-between;
+        }
+        .tele-module:hover { background: #141414; }
+
+        .module-title { font-size: 0.65rem; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
+        .module-value { font-size: 1.4rem; color: var(--text-main); font-weight: 300; display: flex; align-items: baseline;}
+        .module-unit { font-size: 0.75rem; color: #555; margin-left: 6px; }
+        .module-sub { font-size: 0.65rem; color: #444; margin-top: 4px; border-top: 1px solid #222; padding-top: 4px; display: flex; justify-content: space-between;}
+
+        .txt-ok { color: var(--accent); }
+        .txt-warn { color: var(--warn); }
+        .txt-crit { color: var(--danger); }
+
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Thermal Control System <span style="color:#444;">// Node 04</span></h1>
+    <div class="sys-status">
+        <span>SIMULATION: <span class="blink">ACTIVE</span></span>
+        <span>RENDER: WEBGL_EMULATED</span>
+    </div>
+</header>
+
+<div class="main-container">
+    <div class="controls-panel">
+        <div style="font-size:0.7rem; color:#444; border-bottom:1px solid #222; padding-bottom:10px; margin-bottom:10px;">
+            INPUT PARAMETERS
+        </div>
+
+        <div class="control-group">
+            <label>SURFACE TEMP (T) <span class="val-readout" id="d-temp">--</span></label>
+            <input type="range" id="i-temp" min="100" max="3500" value="1800" step="10">
+        </div>
+
+        <div class="control-group">
+            <label>EMISSIVITY (ε) <span class="val-readout" id="d-emiss">--</span></label>
+            <input type="range" id="i-emiss" min="0.01" max="1.0" value="0.95" step="0.01">
+        </div>
+
+        <div class="control-group">
+            <label>LENGTH (L) <span class="val-readout" id="d-len">--</span></label>
+            <input type="range" id="i-len" min="1" max="150" value="80" step="1">
+        </div>
+
+        <div class="control-group">
+            <label>RADIUS (r) <span class="val-readout" id="d-rad">--</span></label>
+            <input type="range" id="i-rad" min="0.05" max="2.0" value="0.30" step="0.01">
+        </div>
+        
+        <div style="margin-top:auto; font-size:0.65rem; color:#444; line-height:1.5;">
+            > INTERACTIVE UI ACTIVE<br>
+            > SURFACE BINDING: LOCKED<br>
+            > FLUX CALCULATIONS: REALTIME
+        </div>
+    </div>
+
+    <div class="viewport" id="viewport">
+        <div class="stars"></div>
+        <div class="pipe-wrapper" id="p-wrap">
+            <div class="pipe-core" id="p-core">
+                <div class="pipe-flow" id="p-flow"></div>
+            </div>
+            <div class="dim-line" id="d-dim">L: 80m</div>
+        </div>
+    </div>
+</div>
+
+<div class="telemetry-panel">
+    <div class="tele-header">
+        <span>REAL-TIME TELEMETRY DATA</span>
+        <span style="margin-left: auto;">REFRESH RATE: 60Hz</span>
+    </div>
+
+    <div class="tele-module">
+        <div class="module-title">Total Dissipation</div>
+        <div class="module-value"><span id="o-power">0</span> <span class="module-unit">kW</span></div>
+        <div class="module-sub">
+            <span>ENTROPY GEN:</span>
+            <span id="o-entropy">0 W/K</span>
+        </div>
+        <div class="module-sub">
+            <span>COOLING TAU:</span>
+            <span id="o-tau">0 s</span>
+        </div>
+    </div>
+
+    <div class="tele-module">
+        <div class="module-title">Flux Density</div>
+        <div class="module-value"><span id="o-flux">0</span> <span class="module-unit">kW/m²</span></div>
+        <div class="module-sub">
+            <span>STATUS:</span>
+            <span id="o-status">NORMAL</span>
+        </div>
+        <div class="module-sub">
+            <span>RAD. PRESSURE:</span>
+            <span id="o-pressure">0 μPa</span>
+        </div>
+    </div>
+
+    <div class="tele-module">
+        <div class="module-title">Peak Emission</div>
+        <div class="module-value"><span id="o-lambda">0</span> <span class="module-unit">μm</span></div>
+        <div class="module-sub">
+            <span>FREQUENCY:</span>
+            <span id="o-freq">0 THz</span>
+        </div>
+        <div class="module-sub">
+            <span>BAND:</span>
+            <span id="o-band">IR</span>
+        </div>
+    </div>
+
+    <div class="tele-module">
+        <div class="module-title">Phase Change Load</div>
+        <div class="module-value"><span id="o-steam">0</span> <span class="module-unit">kg/h</span></div>
+        <div class="module-sub">
+            <span>H2O VAPORIZATION:</span>
+            <span id="o-steam-load" style="color: #00ff9d;">0 MW</span> 
+        </div>
+        <div class="module-sub">
+            <span>REQ. FLOW:</span>
+            <span id="o-flow-v">0 m/s</span>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- CONSTANTS ---
+    const SIGMA = 5.67e-8;  
+    const C_LIGHT = 3e8;    
+    const WIEN_B = 2898;    
+    const LATENT_H = 2260;  
+    
+    // Material Assumptions
+    const DENSITY_STEEL = 7850; 
+    const CP_STEEL = 500;       
+    const WALL_THICKNESS = 0.005; 
+
+    // --- DOM ELEMENTS ---
+    const ui = {
+        iTemp: document.getElementById('i-temp'),
+        iEmiss: document.getElementById('i-emiss'),
+        iLen: document.getElementById('i-len'),
+        iRad: document.getElementById('i-rad'),
+        dTemp: document.getElementById('d-temp'),
+        dEmiss: document.getElementById('d-emiss'),
+        dLen: document.getElementById('d-len'),
+        dRad: document.getElementById('d-rad'),
+        dDim: document.getElementById('d-dim'),
+        vp: document.getElementById('viewport'),
+        wrap: document.getElementById('p-wrap'),
+        core: document.getElementById('p-core'),
+        flow: document.getElementById('p-flow'),
+        oPower: document.getElementById('o-power'),
+        oEntropy: document.getElementById('o-entropy'),
+        oTau: document.getElementById('o-tau'),
+        oFlux: document.getElementById('o-flux'),
+        oStatus: document.getElementById('o-status'),
+        oPress: document.getElementById('o-pressure'),
+        oLambda: document.getElementById('o-lambda'),
+        oFreq: document.getElementById('o-freq'),
+        oBand: document.getElementById('o-band'),
+        oSteam: document.getElementById('o-steam'),
+        oSteamLoad: document.getElementById('o-steam-load'), // NEW
+        oFlowV: document.getElementById('o-flow-v')
+    };
+
+    // --- COLOR ENGINE ---
+    function getBlackbodyColor(k) {
+        let r, g, b;
+        let t = k / 100;
+        if (t <= 66) {
+            r = 255;
+            g = t;
+            g = 99.4708025861 * Math.log(g) - 161.1195681661;
+            if (t <= 19) b = 0; else {
+                b = t - 10;
+                b = 138.5177312231 * Math.log(b) - 305.0447927307;
+            }
+        } else {
+            r = t - 60;
+            r = 329.698727446 * Math.pow(r, -0.1332047592);
+            g = t - 60;
+            g = 288.1221695283 * Math.pow(g, -0.0755148492);
+            b = 255;
+        }
+        return {
+            r: Math.round(Math.max(0, Math.min(255, r))),
+            g: Math.round(Math.max(0, Math.min(255, g))),
+            b: Math.round(Math.max(0, Math.min(255, b)))
+        };
+    }
+
+    // --- MAIN LOOP ---
+    function update() {
+        // 1. READ INPUTS
+        let T = parseFloat(ui.iTemp.value);
+        let E = parseFloat(ui.iEmiss.value);
+        let L = parseFloat(ui.iLen.value);
+        let r = parseFloat(ui.iRad.value);
+
+        // 2. UPDATE TEXT UI
+        ui.dTemp.innerText = T + " K";
+        ui.dEmiss.innerText = E.toFixed(2);
+        ui.dLen.innerText = L + " m";
+        ui.dRad.innerText = r.toFixed(2) + " m";
+        ui.dDim.innerText = `LENGTH: ${L}m // DIA: ${(r*2).toFixed(2)}m`;
+
+        // 3. INTERACTIVE SLIDERS (Visual Fix)
+        
+        // Temp Slider: Gradient
+        let tPercent = ((T - 100) / (3500 - 100)) * 100;
+        let tColor = `rgb(${getBlackbodyColor(T).r}, ${getBlackbodyColor(T).g}, ${getBlackbodyColor(T).b})`;
+        // Gradient applies to input background now visible because track is transparent
+        ui.iTemp.style.background = `linear-gradient(90deg, ${tColor} ${tPercent}%, #222 ${tPercent}%)`;
+
+        // Emissivity Slider
+        let ePercent = ((E - 0.01) / (1.0 - 0.01)) * 100;
+        let eGray = Math.round(150 * (1-E)); 
+        ui.iEmiss.style.background = `linear-gradient(90deg, rgb(${eGray},${eGray},${eGray}) ${ePercent}%, #222 ${ePercent}%)`;
+
+        // Length & Radius (Green Fill)
+        let lPercent = ((L - 1) / (150 - 1)) * 100;
+        ui.iLen.style.background = `linear-gradient(90deg, #00ff9d ${lPercent}%, #222 ${lPercent}%)`;
+        
+        let rPercent = ((r - 0.05) / (2.0 - 0.05)) * 100;
+        ui.iRad.style.background = `linear-gradient(90deg, #00ff9d ${rPercent}%, #222 ${rPercent}%)`;
+
+
+        // 4. PHYSICS CALCULATIONS
+        let Area = 2 * Math.PI * r * L;
+        let PowerW = E * SIGMA * Area * Math.pow(T, 4);
+        let FluxW = PowerW / Area; 
+
+        // Deep Details
+        let EntropyGen = PowerW / T;
+        let RadPressPa = FluxW / C_LIGHT;
+        let LambdaMicron = WIEN_B / T;
+        let FreqTHz = (C_LIGHT / (LambdaMicron * 1e-6)) / 1e12;
+        let VolShell = Area * WALL_THICKNESS;
+        let Mass = DENSITY_STEEL * VolShell;
+        let Tau = (Mass * CP_STEEL) / (4 * E * SIGMA * Area * Math.pow(T, 3));
+        let SteamKgH = (PowerW / 1000) / LATENT_H * 3600;
+        let m_dot_sec = SteamKgH / 3600;
+        let FlowVel = m_dot_sec / (1000 * Math.PI * r * r);
+
+        // 5. UPDATE TELEMETRY
+        ui.oPower.innerText = (PowerW / 1000).toFixed(1);
+        ui.oEntropy.innerText = EntropyGen.toFixed(1) + " W/K";
+        ui.oTau.innerText = Tau.toFixed(1) + " s";
+        ui.oFlux.innerText = (FluxW / 1000).toFixed(1);
+        ui.oPress.innerText = (RadPressPa * 1e6).toFixed(2) + " μPa";
+        
+        let statusEl = ui.oStatus;
+        if(FluxW < 10000) { statusEl.innerText = "PASSIVE"; statusEl.className = ""; }
+        else if(FluxW < 100000) { statusEl.innerText = "OPTIMAL"; statusEl.className = "txt-ok"; }
+        else if(FluxW < 500000) { statusEl.innerText = "WARNING"; statusEl.className = "txt-warn"; }
+        else { statusEl.innerText = "CRITICAL"; statusEl.className = "txt-crit"; }
+
+        ui.oLambda.innerText = LambdaMicron.toFixed(2);
+        ui.oFreq.innerText = FreqTHz.toFixed(1) + " THz";
+        
+        let band = "FAR-IR";
+        if(LambdaMicron < 0.75) band = "VISIBLE";
+        else if(LambdaMicron < 1.5) band = "NEAR-IR";
+        else if(LambdaMicron < 3.0) band = "MID-IR";
+        ui.oBand.innerText = band;
+
+        ui.oSteam.innerText = SteamKgH.toFixed(0);
+        // NEW: Populate the missing value for H2O Vaporization
+        ui.oSteamLoad.innerText = (PowerW / 1000000).toFixed(2) + " MW"; 
+        
+        ui.oFlowV.innerText = (FlowVel * 1000).toFixed(2) + " mm/s";
+
+        // 6. VISUAL RENDER
+        let maxW = ui.vp.clientWidth * 0.9;
+        let pxPerM = maxW / 150; 
+        let vW = Math.max(20, L * pxPerM);
+        let vH = Math.max(10, r * 200);
+
+        ui.wrap.style.width = vW + "px";
+        ui.wrap.style.height = vH + "px";
+
+        // Color Logic
+        let rgb = getBlackbodyColor(T);
+        let colStr = `rgb(${rgb.r},${rgb.g},${rgb.b})`;
+        let opacity = 0.5 + (E * 0.5); 
+        let coreCol = (T > 2500) ? '#fff' : colStr;
+
+        if(T < 800) {
+            ui.core.style.background = `linear-gradient(to bottom, #1a1a1a, #2a2a2a, #1a1a1a)`;
+            ui.core.style.boxShadow = `none`;
+            ui.flow.style.opacity = 0.1;
+        } else {
+            ui.core.style.background = `linear-gradient(to bottom, #111, ${coreCol}, #111)`;
+            
+            let glowIntensity = (FluxW / 50000); 
+            let blurRad = Math.min(120, glowIntensity * 40);
+            let spreadRad = Math.min(40, glowIntensity * 10);
+            
+            ui.core.style.boxShadow = `0 0 ${blurRad}px ${spreadRad}px ${colStr}`;
+            ui.flow.style.opacity = 0.1 + (glowIntensity * 0.2); 
+        }
+    }
+
+    // --- EVENTS ---
+    window.addEventListener('resize', update);
+    [ui.iTemp, ui.iEmiss, ui.iLen, ui.iRad].forEach(e => e.addEventListener('input', update));
+    
+    // Init
+    update();
+
+</script>
+</body>
+</html>
